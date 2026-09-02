@@ -1,0 +1,14 @@
+# Runtime dependencies for the workspace-tool-office sidecar image.
+# Keep in sync with [project.dependencies] in pyproject.toml.
+
+# MCP server SDK: FastMCP + Streamable HTTP transport. Exposes the
+# `convert` tool the workspace agent calls over http://localhost:8090/mcp.
+mcp>=1.2,<2
+
+# Document AUTHORING libraries (pure-python; coexist with the image's
+# LibreOffice, which stays for `convert`). These back author_xlsx/docx/pptx —
+# the sanctioned way the agent creates Office files, so it never hand-writes a
+# corrupt one. python-pptx pulls in Pillow + lxml transitively.
+openpyxl>=3.1
+python-docx>=1.1
+python-pptx>=0.6
