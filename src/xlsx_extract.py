@@ -30,10 +30,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Same rationale as pdf_text.MAX_TEXT_CHARS: this return value goes straight
-# into the agent's tool_result / context, and an oversized message previously
-# killed a whole SDK session (docs/incidents/2026-08-04-workspace-sdk-1mib-
-# message-buffer.md). A tender costsheet is normally tens to low hundreds of
-# rows; this is a generous ceiling, not a target.
+# into the agent's tool_result / context, and an oversized message can crash
+# the whole agent session (a multi-megabyte tool_result has been observed to
+# do this). A tender costsheet is normally tens to low hundreds of rows; this
+# is a generous ceiling, not a target.
 MAX_CELLS = 50_000
 
 
