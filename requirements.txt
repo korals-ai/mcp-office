@@ -9,6 +9,7 @@ mcp>=1.2,<2
 # LibreOffice, which stays for `convert`). These back author_xlsx/docx/pptx —
 # the sanctioned way the agent creates Office files, so it never hand-writes a
 # corrupt one. python-pptx pulls in Pillow + lxml transitively.
+# openpyxl also backs xlsx_extract_cells (structured reads, not just authoring).
 openpyxl>=3.1
 python-docx>=1.1
 python-pptx>=0.6

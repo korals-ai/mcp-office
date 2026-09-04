@@ -102,3 +102,39 @@ def test_pdf_extract_text_missing_source_raises(tmp_path) -> None:
 
     with pytest.raises(PdfTextExtractError):
         server.pdf_extract_text(str(tmp_path / "absent.pdf"))
+
+
+@pytest.mark.asyncio
+async def test_xlsx_extract_cells_tool_is_registered() -> None:
+    tools = await server.mcp.list_tools()
+    names = {t.name for t in tools}
+    assert "xlsx_extract_cells" in names
+
+
+@pytest.mark.asyncio
+async def test_xlsx_extract_cells_tool_describes_src_and_sheet() -> None:
+    tools = await server.mcp.list_tools()
+    tool = next(t for t in tools if t.name == "xlsx_extract_cells")
+    schema = tool.inputSchema
+    assert "src" in schema["properties"]
+    assert "sheet" in schema["properties"]
+    assert "src" in schema.get("required", [])
+
+
+def test_xlsx_extract_cells_missing_source_raises(tmp_path) -> None:
+    from src.xlsx_extract import XlsxExtractError
+
+    with pytest.raises(XlsxExtractError):
+        server.xlsx_extract_cells(str(tmp_path / "absent.xlsx"))
+
+
+def test_xlsx_extract_cells_reads_a_real_workbook(tmp_path) -> None:
+    from openpyxl import Workbook
+
+    dest = tmp_path / "book.xlsx"
+    wb = Workbook()
+    wb.active.append(["a", "b"])
+    wb.save(dest)
+
+    result = server.xlsx_extract_cells(str(dest))
+    assert result["Sheet"]["rows"] == [["a", "b"]]

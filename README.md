@@ -3,7 +3,7 @@
 Convert, rasterize and author Office documents. An [MCP](https://modelcontextprotocol.io) server speaking Streamable
 HTTP: run it in a container, point your agent at `http://localhost:8090/mcp`.
 
-LibreOffice document conversion (DOCX/XLSX/PPTX/ODF/PDF/HTML/TXT round-trips), PDF page rasterization and text extraction, and authoring of new DOCX/XLSX/PPTX/PDF files from structured input.
+LibreOffice document conversion (DOCX/XLSX/PPTX/ODF/PDF/HTML/TXT round-trips), PDF page rasterization and text extraction, structured Excel cell reads, and authoring of new DOCX/XLSX/PPTX/PDF files from structured input.
 
 ## Quickstart
 
@@ -45,6 +45,7 @@ MCP_UID=$(id -u) MCP_GID=$(id -g) docker compose up   # if your uid is not 1000
 - `convert`
 - `pdf_to_images`
 - `pdf_extract_text`
+- `xlsx_extract_cells`
 - `author_xlsx`
 - `author_docx`
 - `author_pptx`

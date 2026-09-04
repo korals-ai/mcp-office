@@ -53,6 +53,8 @@ from src.pdf_rasterize import PdfRasterizeError
 from src.pdf_rasterize import pdf_to_images as _pdf_to_images
 from src.pdf_text import PdfTextExtractError
 from src.pdf_text import extract_text as _extract_text
+from src.xlsx_extract import XlsxExtractError
+from src.xlsx_extract import extract_cells as _extract_cells
 
 log = logging.getLogger("workspace-tool-office")
 
@@ -221,6 +223,57 @@ def pdf_extract_text(src: str) -> str:
         source.name,
     )
     return text
+
+
+@mcp.tool()
+def xlsx_extract_cells(src: str, sheet: str = "") -> dict[str, dict[str, object]]:
+    """Read an Excel workbook's real cell values — the deterministic
+    alternative to converting it to text/CSV and reparsing, or to writing a
+    one-off Bash + openpyxl script.
+
+    Use this to reconcile a spreadsheet's numbers (e.g. a tender costsheet
+    against a client-facing price letter) instead of a hand-rolled script:
+    it returns typed values (numbers stay numbers), preserves blank
+    rows/columns so row numbers still line up with the source file, and reads
+    formulas as their last-computed result, not the formula text.
+
+    Args:
+        src: Absolute path to the source ``.xlsx`` on the shared workspace
+            volume. The file is read in place.
+        sheet: Restrict to one sheet by name (Excel's tab name), e.g.
+            "Costsheet Corning". Defaults to "" — all sheets.
+
+    Returns:
+        ``{sheet_title: {"dimensions": "A1:D10", "rows": [[...], ...]}}``,
+        one entry per sheet (or just the requested one). ``rows`` is every
+        row in the sheet's used range, each a list of cell values in column
+        order.
+
+    Raises:
+        An MCP tool error for a missing/corrupt source, an unknown sheet
+        name, or a workbook too large for this tool (ask the user to split
+        it or narrow ``sheet``).
+    """
+    source = Path(src)
+    started = time.monotonic()
+    try:
+        sheets = _extract_cells(source, sheet=sheet or None)
+    except XlsxExtractError as exc:
+        log.warning(
+            "tool=office op=xlsx_extract_cells outcome=error dur_ms=%d sheet=%s src=%s err=%s",
+            int((time.monotonic() - started) * 1000),
+            sheet or "*",
+            source.name,
+            exc,
+        )
+        raise
+    log.info(
+        "tool=office op=xlsx_extract_cells outcome=ok dur_ms=%d sheets=%d src=%s",
+        int((time.monotonic() - started) * 1000),
+        len(sheets),
+        source.name,
+    )
+    return sheets
 
 
 def _log_author(op: str, dest: Path, started: float, ok: bool, err: object = "") -> None:
