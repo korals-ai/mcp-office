@@ -50,6 +50,7 @@ MCP_UID=$(id -u) MCP_GID=$(id -g) docker compose up   # if your uid is not 1000
 - `author_docx`
 - `author_pptx`
 - `author_pdf`
+- `office_shell` — shell escape hatch for whatever the above don't cover.
 
 Each tool's own description and typed signature — what the agent actually reads
 to decide when to call it — is in `src/server.py`.

@@ -138,3 +138,34 @@ def test_xlsx_extract_cells_reads_a_real_workbook(tmp_path) -> None:
 
     result = server.xlsx_extract_cells(str(dest))
     assert result["Sheet"]["rows"] == [["a", "b"]]
+
+
+@pytest.mark.asyncio
+async def test_office_shell_tool_is_registered() -> None:
+    tools = await server.mcp.list_tools()
+    names = {t.name for t in tools}
+    assert "office_shell" in names
+
+
+@pytest.mark.asyncio
+async def test_office_shell_tool_describes_cmd_and_cwd() -> None:
+    tools = await server.mcp.list_tools()
+    tool = next(t for t in tools if t.name == "office_shell")
+    schema = tool.inputSchema
+    assert "cmd" in schema["properties"]
+    assert "cwd" in schema["properties"]
+    assert "cmd" in schema.get("required", [])
+
+
+def test_office_shell_empty_command_raises() -> None:
+    from src.office_shell import OfficeShellError
+
+    with pytest.raises(OfficeShellError):
+        server.office_shell("   ")
+
+
+def test_office_shell_runs_a_real_command(tmp_path) -> None:
+    result = server.office_shell("echo hello", cwd=str(tmp_path))
+    assert result["exit_code"] == 0
+    assert result["stdout"].strip() == "hello"
+    assert result["timed_out"] is False

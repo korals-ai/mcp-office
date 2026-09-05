@@ -49,6 +49,8 @@ from src.office_convert import (
 from src.office_convert import (
     convert as _convert,
 )
+from src.office_shell import OfficeShellError
+from src.office_shell import run_shell as _run_shell
 from src.pdf_rasterize import PdfRasterizeError
 from src.pdf_rasterize import pdf_to_images as _pdf_to_images
 from src.pdf_text import PdfTextExtractError
@@ -274,6 +276,66 @@ def xlsx_extract_cells(src: str, sheet: str = "") -> dict[str, dict[str, object]
         source.name,
     )
     return sheets
+
+
+@mcp.tool()
+def office_shell(cmd: str, cwd: str = "") -> dict[str, object]:
+    """Run a shell command inside this office tool pod — the fallback for
+    whatever the other tools here (``convert``, ``pdf_extract_text``,
+    ``xlsx_extract_cells``, the ``author_*`` tools) don't cover.
+
+    Prefer a curated tool above whenever one fits — it's faster, tested, and
+    the sanctioned path. Reach for this only for genuinely uncovered work,
+    typically something that needs LibreOffice (``soffice``) or another
+    binary already on this pod's PATH with no equivalent in the workspace
+    pod's own Bash. Every call here is logged and alerted on, so it should
+    stay rare — a repeated pattern is a signal to ask for a proper tool
+    instead of reaching for this again.
+
+    This does NOT replace Bash in the workspace pod for spreadsheet/PDF-text
+    reads via openpyxl/pdftotext — that path stays exactly as it is; this
+    tool runs in a *different* pod, for *different* (heavier) operations.
+
+    Args:
+        cmd: The shell command to run, exactly as you'd give it to Bash
+            (e.g. ``"soffice --headless --convert-to pdf --outdir /home/agent /home/agent/x.docx"``).
+        cwd: Absolute directory to run it in. Defaults to the shared
+            workspace volume root.
+
+    Returns:
+        ``{"exit_code": int, "stdout": str, "stderr": str, "timed_out": bool}``.
+        A non-zero exit code or ``timed_out: true`` is a normal result, not
+        an MCP tool error — read stdout/stderr and decide what to do next,
+        the same way you would after a failed Bash call.
+
+    Raises:
+        An MCP tool error only when the command never started at all (empty
+        command, or ``cwd`` doesn't exist).
+    """
+    started = time.monotonic()
+    try:
+        result = _run_shell(cmd, cwd=Path(cwd) if cwd else None)
+    except OfficeShellError as exc:
+        log.warning(
+            "tool=office op=office_shell outcome=error dur_ms=%d cmd=%s err=%s",
+            int((time.monotonic() - started) * 1000),
+            cmd[:500],
+            exc,
+        )
+        raise
+    log.info(
+        "tool=office op=office_shell outcome=ok dur_ms=%d exit_code=%d timed_out=%s cmd=%s",
+        int((time.monotonic() - started) * 1000),
+        result.exit_code,
+        result.timed_out,
+        cmd[:500],
+    )
+    return {
+        "exit_code": result.exit_code,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "timed_out": result.timed_out,
+    }
 
 
 def _log_author(op: str, dest: Path, started: float, ok: bool, err: object = "") -> None:
