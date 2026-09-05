@@ -285,16 +285,12 @@ def office_shell(cmd: str, cwd: str = "") -> dict[str, object]:
     ``xlsx_extract_cells``, the ``author_*`` tools) don't cover.
 
     Prefer a curated tool above whenever one fits — it's faster, tested, and
-    the sanctioned path. Reach for this only for genuinely uncovered work,
+    the sanctioned path (spreadsheet reads: ``xlsx_extract_cells``; PDF text:
+    ``pdf_extract_text``). Reach for this only for genuinely uncovered work,
     typically something that needs LibreOffice (``soffice``) or another
-    binary already on this pod's PATH with no equivalent in the workspace
-    pod's own Bash. Every call here is logged and alerted on, so it should
-    stay rare — a repeated pattern is a signal to ask for a proper tool
-    instead of reaching for this again.
-
-    This does NOT replace Bash in the workspace pod for spreadsheet/PDF-text
-    reads via openpyxl/pdftotext — that path stays exactly as it is; this
-    tool runs in a *different* pod, for *different* (heavier) operations.
+    binary on this pod's PATH with no MCP equivalent. Every call here is
+    logged and alerted on, so it should stay rare — a repeated pattern is a
+    signal to ask for a proper tool instead of reaching for this again.
 
     Args:
         cmd: The shell command to run, exactly as you'd give it to Bash
