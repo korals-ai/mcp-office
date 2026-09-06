@@ -63,8 +63,8 @@ log = logging.getLogger("workspace-tool-office")
 # Bind on all interfaces inside the pod; the workspace container reaches this
 # over localhost. Distinct from the workspace server's :8080 so the two share
 # a pod network namespace without colliding. Override via env for tests.
-HOST = os.environ.get("WORKSPACE_TOOL_HOST", "0.0.0.0")  # noqa: S104 - pod-local, reached via localhost
-PORT = int(os.environ.get("WORKSPACE_TOOL_PORT", "8090"))
+HOST = "0.0.0.0"  # noqa: S104 - pod-local bind; nothing injects a host, the pod netns is the fence
+PORT = int(os.environ["WORKSPACE_TOOL_PORT"])
 
 # FastMCP serves the Streamable HTTP endpoint at ``/mcp`` by default; the
 # workspace SDK registers ``http://localhost:8090/mcp`` (phase 3b).

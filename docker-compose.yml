@@ -21,3 +21,7 @@ services:
     environment:
       # The image's own HOME is not writable under a different uid; /tmp is.
       HOME: /tmp
+      # REQUIRED — src/server.py reads it with no default, exactly as the
+      # workspace-operator injects it into the tool pod. Must match the
+      # published port above and the operator roster entry for office.
+      WORKSPACE_TOOL_PORT: "8090"

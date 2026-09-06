@@ -89,7 +89,7 @@ def run_shell(
     """
     if not cmd.strip():
         raise OfficeShellError("empty command")
-    work_dir = cwd or Path(os.environ.get("HOME", "/home/agent"))
+    work_dir = cwd or Path(os.environ["HOME"])
     if not work_dir.is_dir():
         raise OfficeShellError(f"cwd does not exist: {work_dir}")
 

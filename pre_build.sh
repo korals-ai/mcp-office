@@ -13,6 +13,11 @@ log "Running pre-build checks..."
 
 cd "$SCRIPT_DIR"
 
+# src/server.py reads WORKSPACE_TOOL_PORT with NO default (the operator injects
+# it in the tool pod), and tests/test_server.py imports that module — so the
+# runner supplies it explicitly here. Never a conftest setdefault.
+export WORKSPACE_TOOL_PORT=8090
+
 VENV="$SCRIPT_DIR/.venv"
 
 if [ ! -x "$VENV/bin/ruff" ]; then
