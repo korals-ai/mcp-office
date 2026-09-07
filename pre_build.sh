@@ -82,5 +82,8 @@ log "  ✓ pytest passed"
 log "Gating the shared toollog package..."
 bash "$TL_PARENT/toollog/check.sh" "$RUFF" "$MYPY" "$PYTEST" || fail "toollog"
 log "  ✓ toollog passed"
+log "Gating the shared loopwatch package..."
+bash "$TL_PARENT/loopwatch/check.sh" "$RUFF" "$MYPY" "$PYTEST" || fail "loopwatch"
+log "  ✓ loopwatch passed"
 
 log "Pre-build checks complete ✓"

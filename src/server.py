@@ -25,6 +25,7 @@ import os
 import time
 from pathlib import Path
 
+import loopwatch
 import toollog
 from mcp.server.fastmcp import FastMCP
 
@@ -69,7 +70,7 @@ PORT = int(os.environ["WORKSPACE_TOOL_PORT"])
 
 # FastMCP serves the Streamable HTTP endpoint at ``/mcp`` by default; the
 # workspace SDK registers ``http://localhost:8090/mcp`` (phase 3b).
-mcp = FastMCP("office", host=HOST, port=PORT)
+mcp = FastMCP("office", host=HOST, port=PORT, lifespan=loopwatch.lifespan)
 
 
 @mcp.tool()
