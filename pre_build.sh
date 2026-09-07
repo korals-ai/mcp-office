@@ -45,6 +45,15 @@ HINT="  Install: $VENV/bin/pip install --index-url https://pypi.org/simple/ -e '
 [ -n "$PYTEST" ]    || fail "pytest not found. $HINT"
 [ -n "$PIP_AUDIT" ] || fail "pip-audit not found. $HINT"
 
+# The shared `toollog` package lives one level up; the image COPYs it next to
+# src and imports it as `toollog`. Put its parent on the import path so the
+# import resolves for mypy and pytest exactly as it does in the image (/app on
+# sys.path under `python -m`), and gate the package itself — it has no manifest,
+# so nothing else would.
+TL_PARENT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export PYTHONPATH="$TL_PARENT${PYTHONPATH:+:$PYTHONPATH}"
+export MYPYPATH="$TL_PARENT${MYPYPATH:+:$MYPYPATH}"
+
 log "1/5 Format check (ruff format)..."
 "$RUFF" format --check src tests || fail "ruff format (run: ruff format src tests)"
 log "  ✓ ruff format passed"
@@ -69,5 +78,9 @@ else
   "$PYTEST" -q || fail "pytest"
 fi
 log "  ✓ pytest passed"
+
+log "Gating the shared toollog package..."
+bash "$TL_PARENT/toollog/check.sh" "$RUFF" "$MYPY" "$PYTEST" || fail "toollog"
+log "  ✓ toollog passed"
 
 log "Pre-build checks complete ✓"

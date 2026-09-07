@@ -25,6 +25,7 @@ import os
 import time
 from pathlib import Path
 
+import toollog
 from mcp.server.fastmcp import FastMCP
 
 from src.office_author import (
@@ -482,7 +483,7 @@ def author_pdf(path: str, title: str = "", paragraphs: list[str] | None = None) 
 
 def main() -> None:
     """Run the MCP server forever over Streamable HTTP. Blocks; entrypoint."""
-    logging.basicConfig(level=logging.INFO)
+    toollog.configure("office")
     log.info(
         "workspace-tool-office MCP server on %s:%d (/mcp) — formats: %s",
         HOST,

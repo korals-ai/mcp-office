@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc musl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY workspace-tools/office/requirements.txt .
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
@@ -51,7 +51,12 @@ WORKDIR /app
 COPY --from=py-builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=py-builder /usr/local/bin /usr/local/bin
 
-COPY src ./src
+COPY workspace-tools/office/src ./src
+# The one log format every tool image installs (apps/workspace-tools/toollog).
+# COPY'd next to src, imported as `toollog` under `python -m` from /app — the
+# same shape connector_base uses. Stdlib-only, so it adds no requirements.
+COPY workspace-tools/toollog ./toollog
+
 
 ENV PYTHONPATH=/app
 
