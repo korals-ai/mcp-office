@@ -72,6 +72,10 @@ PORT = int(os.environ["WORKSPACE_TOOL_PORT"])
 # workspace SDK registers ``http://localhost:8090/mcp`` (phase 3b).
 mcp = FastMCP("office", host=HOST, port=PORT, lifespan=loopwatch.lifespan)
 
+# The liveness target. Answered by the loop above, so silence means wedged —
+# see loopwatch.serve_health.
+loopwatch.serve_health(mcp)
+
 
 @mcp.tool()
 def convert(src: str, to: str = "pdf") -> str:
