@@ -8,8 +8,8 @@ rows of typed cell values (numbers, strings, dates, formula RESULTS via
 alignment across merged cells or blank columns.
 
 Before this existed, the only way for the agent to read an xlsx's cells was
-raw Bash + an inline openpyxl script (see the metrobit tender-reconciliation
-chat, 2026-09-04) — this makes that a first-class, tested tool instead of an
+raw Bash + an inline openpyxl script, observed in a real spreadsheet
+reconciliation task — this makes that a first-class, tested tool instead of an
 ad-hoc shell one-liner, matching how ``pdf_extract_text`` replaced raw
 ``pdftotext`` calls.
 
