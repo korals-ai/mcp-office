@@ -57,6 +57,13 @@ class OfficeShellError(RuntimeError):
     the same way it already reacts to a failed Bash call."""
 
 
+# Where the tenant's volume is mounted in this pod. The operator mounts the
+# PVC at the agent's home for every tool container (workspace-operator
+# podspec.go ``agentHome``); this container's own $HOME is /home/tool, which
+# is NOT the volume — defaulting to it made every relative command fail.
+WORKSPACE_VOLUME_ROOT = Path("/home/agent")
+
+
 @dataclass(frozen=True)
 class ShellResult:
     exit_code: int
@@ -89,7 +96,7 @@ def run_shell(
     """
     if not cmd.strip():
         raise OfficeShellError("empty command")
-    work_dir = cwd or Path(os.environ["HOME"])
+    work_dir = cwd or WORKSPACE_VOLUME_ROOT
     if not work_dir.is_dir():
         raise OfficeShellError(f"cwd does not exist: {work_dir}")
 

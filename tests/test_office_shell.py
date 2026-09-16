@@ -58,3 +58,21 @@ def test_large_output_is_truncated(tmp_path: Path) -> None:
     )
     assert len(result.stdout) <= MAX_OUTPUT_CHARS + 200
     assert "truncated" in result.stdout
+
+
+def test_default_cwd_is_the_workspace_volume_root_not_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This container's $HOME is /home/tool, which is not the tenant volume;
+    a relative command with cwd omitted must run at the volume root.
+    Observes, if absent: pwd printing $HOME (or the cwd-does-not-exist error)."""
+    from src import office_shell
+
+    monkeypatch.setenv("HOME", str(tmp_path / "not-the-volume"))
+    (tmp_path / "not-the-volume").mkdir()
+    monkeypatch.setattr(office_shell, "WORKSPACE_VOLUME_ROOT", tmp_path)
+
+    result = office_shell.run_shell("pwd")
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == str(tmp_path.resolve())

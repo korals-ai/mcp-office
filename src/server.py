@@ -58,7 +58,8 @@ from src.pdf_rasterize import pdf_to_images as _pdf_to_images
 from src.pdf_text import PdfTextExtractError
 from src.pdf_text import extract_text as _extract_text
 from src.xlsx_extract import XlsxExtractError
-from src.xlsx_extract import extract_cells as _extract_cells
+from src.xlsx_extract import extract_sheet as _extract_sheet
+from src.xlsx_extract import list_sheets as _list_sheets
 
 log = logging.getLogger("workspace-tool-office")
 
@@ -240,38 +241,60 @@ def pdf_extract_text(src: str) -> str:
 
 
 @mcp.tool()
-def xlsx_extract_cells(src: str, sheet: str = "") -> dict[str, dict[str, object]]:
-    """Read an Excel workbook's real cell values — the deterministic
-    alternative to converting it to text/CSV and reparsing, or to writing a
-    one-off Bash + openpyxl script.
+def xlsx_extract_cells(
+    src: str, sheet: str = "", min_row: int = 0, max_row: int = 0
+) -> dict[str, object]:
+    """Read an Excel workbook's real cell values, in two steps: call once
+    WITHOUT ``sheet`` to see the workbook's sheet index, then once per sheet
+    you need. There is no spreadsheet library in your own pod — this tool is
+    the way to read a workbook (typed values, no CSV reparsing).
 
-    Use this to reconcile a spreadsheet's numbers (e.g. a tender costsheet
-    against a client-facing price letter) instead of a hand-rolled script:
-    it returns typed values (numbers stay numbers), preserves blank
-    rows/columns so row numbers still line up with the source file, and reads
-    formulas as their last-computed result, not the formula text.
+    Step 1 — ``sheet`` omitted: returns an INDEX, not cell data —
+    ``{"sheets": [{"title": ..., "dimensions": "A1:T106", "rows": 106,
+    "non_empty_cells": 2510}, ...]}`` in workbook order. Pick the sheet(s)
+    you need by ``title``. Cheap on any workbook.
+
+    Step 2 — ``sheet="<title>"``: returns that one sheet —
+    ``{"title": ..., "dimensions": ..., "rows": {"<excel row number>":
+    [cells...]}}``. ``rows`` is keyed by the 1-based Excel row number as a
+    string; each value is that row's cells in column order from column A
+    (index 0 = A, 5 = F), so cell F3 is ``rows["3"][5]``. To keep the result
+    small, trailing blank cells are trimmed from each row (a row list can be
+    shorter than the sheet is wide — bounds-check before indexing) and rows
+    with no values are omitted (keys skip numbers). Blank cells BETWEEN
+    values are kept as null. Numbers stay numbers, dates are ISO-8601
+    strings, and formulas come back as their last-computed result, not the
+    formula text (a never-calculated formula reads as blank).
 
     Args:
-        src: Absolute path to the source ``.xlsx`` on the shared workspace
-            volume. The file is read in place.
-        sheet: Restrict to one sheet by name (Excel's tab name), e.g.
-            "Costsheet Corning". Defaults to "" — all sheets.
+        src: Absolute path to the ``.xlsx`` on the shared workspace volume
+            (``/home/agent/...``): this tool runs in a sidecar that shares the
+            volume but not your working directory, so a relative path does
+            not resolve. The file is read in place.
+        sheet: Excel tab name exactly as the index lists it, e.g.
+            "Costsheet Corning". Default "" — return the index instead.
+        min_row: First Excel row to return (1-based). Default 0 — from row 1.
+        max_row: Last Excel row to return (inclusive). Default 0 — to the end.
+            Page a big sheet (say 200 rows a call) instead of pulling it whole:
+            a dense sheet returned in one call can exceed your tool-result
+            limit and get parked on disk. Keys stay the real row numbers.
 
     Returns:
-        ``{sheet_title: {"dimensions": "A1:D10", "rows": [[...], ...]}}``,
-        one entry per sheet (or just the requested one). ``rows`` is every
-        row in the sheet's used range, each a list of cell values in column
-        order.
+        The sheet index (no ``sheet``) or one sheet's rows (``sheet`` given),
+        as described above.
 
     Raises:
-        An MCP tool error for a missing/corrupt source, an unknown sheet
-        name, or a workbook too large for this tool (ask the user to split
-        it or narrow ``sheet``).
+        An MCP tool error for a missing/corrupt source, a ``sheet`` that is
+        not in the workbook (the message lists the real titles), or a single
+        sheet over this tool's cell ceiling (ask the user to split it).
     """
     source = Path(src)
     started = time.monotonic()
     try:
-        sheets = _extract_cells(source, sheet=sheet or None)
+        if sheet:
+            cells = _extract_sheet(source, sheet, min_row=min_row, max_row=max_row)
+        else:
+            index = _list_sheets(source)
     except XlsxExtractError as exc:
         log.warning(
             "tool=office op=xlsx_extract_cells outcome=error dur_ms=%d sheet=%s src=%s err=%s",
@@ -281,13 +304,26 @@ def xlsx_extract_cells(src: str, sheet: str = "") -> dict[str, dict[str, object]
             exc,
         )
         raise
+    if sheet:
+        log.info(
+            "tool=office op=xlsx_extract_cells outcome=ok dur_ms=%d sheet=%s rows=%d src=%s",
+            int((time.monotonic() - started) * 1000),
+            sheet,
+            len(cells["rows"]),
+            source.name,
+        )
+        # TypedDict -> plain dict: FastMCP emits an unwrapped structured result
+        # only for a `dict[str, ...]` return annotation (a Union or Mapping is
+        # wrapped in {"result": ...} on the wire), and mypy won't pass a
+        # TypedDict where a dict is declared.
+        return dict(cells)
     log.info(
-        "tool=office op=xlsx_extract_cells outcome=ok dur_ms=%d sheets=%d src=%s",
+        "tool=office op=xlsx_extract_cells outcome=ok dur_ms=%d sheet=* sheets=%d src=%s",
         int((time.monotonic() - started) * 1000),
-        len(sheets),
+        len(index["sheets"]),
         source.name,
     )
-    return sheets
+    return dict(index)
 
 
 @mcp.tool()
