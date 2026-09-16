@@ -25,3 +25,8 @@ services:
       # workspace-operator injects it into the tool pod. Must match the
       # published port above and the operator roster entry for office.
       WORKSPACE_TOOL_PORT: "8090"
+      # REQUIRED — base URL of a Collabora Online (CODE) instance whose
+      # /cool/convert-to the `convert` tool POSTs documents to. No default;
+      # run one locally with `docker run -p 9980:9980 collabora/code` and its
+      # `net.post_allow.host` admitting this container.
+      OFFICE_CONVERT_URL: "http://host.docker.internal:9980"

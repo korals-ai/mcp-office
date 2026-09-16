@@ -1,9 +1,8 @@
 # Toolspace sidecar (office): a per-chat co-located helper container that
-# owns LibreOffice (document conversion) and poppler-utils (PDF page
-# rasterization) and exposes both as MCP tools over Streamable HTTP
-# (http://localhost:8090/mcp). The workspace agent calls it instead of
-# running soffice/pdftoppm itself — letting the workspace image shed
-# LibreOffice (~378 MB) in a later phase.
+# owns document conversion (POSTed to a shared Collabora Online service —
+# no LibreOffice in this image), poppler-utils
+# (PDF page rasterization + text) and the python office authoring libraries,
+# exposed as MCP tools over Streamable HTTP (http://localhost:8090/mcp).
 #
 # Design + rationale: docs/plan/20260619-200506-toolspace-sidecar.md
 # (the "orbital workspace-tools" sidecar substrate; §6b for the MCP-over-HTTP +
@@ -25,24 +24,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 FROM python:3.12-slim
 
-# LibreOffice + the native libs / fonts it needs to render Office docs
-# headlessly. Keep on Debian (not Alpine) — LibreOffice packages not
-# available/recent on Alpine.
+# poppler-utils (pdftoppm/pdftotext) plus fonts for rasterizing PDFs whose
+# text is not embedded. Conversion needs nothing here — it is a POST to the
+# shared office service.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
-      libpango-1.0-0 \
-      libpangoft2-1.0-0 \
-      libcairo2 \
-      libgdk-pixbuf-2.0-0 \
-      shared-mime-info \
       fonts-dejavu \
       fonts-liberation \
-      fonts-crosextra-carlito \
-      fonts-crosextra-caladea \
-      libreoffice-writer \
-      libreoffice-calc \
-      libreoffice-impress \
       poppler-utils \
  && rm -rf /var/lib/apt/lists/*
 
@@ -67,7 +56,7 @@ ENV PYTHONPATH=/app
 
 # Mirror the workspace pod's unprivileged identity (uid/gid 65532) so that
 # when co-located in the workspace pod sharing the tenant PVC subPath, files
-# soffice writes carry the ownership the main container expects (fsGroup
+# the tools write carry the ownership the main container expects (fsGroup
 # 65532). See workspace Dockerfile + apps/workspace-operator podSpec
 # securityContext.
 RUN groupadd --system --gid 65532 tool \

@@ -1,12 +1,12 @@
 """Toolspace sidecar (office) — MCP server over Streamable HTTP.
 
-Exposes LibreOffice document conversion as an MCP tool the workspace agent
-calls over ``http://localhost:8090/mcp`` (the two containers share the pod
-network namespace). The file itself never crosses the wire: the agent names
-a path on the shared tenant PVC, this sidecar opens it in place, runs
-``soffice``, and writes the result back to the PVC — the RPC carries only the
-path + verdict (zero-copy data plane; see
-docs/plan/20260619-200506-toolspace-sidecar.md §6b).
+Exposes office document conversion as an MCP tool the workspace agent calls
+over ``http://localhost:8090/mcp`` (the two containers share the pod network
+namespace). The file never crosses the MCP wire: the agent names a path on
+the shared tenant PVC, this sidecar reads it in place, hands the bytes to the
+platform's shared office service (Collabora Online, ``/cool/convert-to``) and
+writes the answer back to the PVC — the RPC carries only the path + verdict
+(zero-copy data plane; see docs/plan/20260619-200506-toolspace-sidecar.md §6b).
 
 Transport is **Streamable HTTP** (one of MCP's two standard transports) rather
 than stdio precisely because the server lives in a separate container from the
@@ -68,6 +68,12 @@ log = logging.getLogger("workspace-tool-office")
 HOST = "0.0.0.0"  # noqa: S104 - pod-local bind; nothing injects a host, the pod netns is the fence
 PORT = int(os.environ["WORKSPACE_TOOL_PORT"])
 
+# Base URL of the shared office service every conversion is POSTed to
+# (Collabora Online — the same LibreOffice the browser editor runs on). Injected
+# by the operator's roster entry; no default, so a pod without it never
+# starts rather than failing on the first convert.
+CONVERT_URL = os.environ["OFFICE_CONVERT_URL"]
+
 # FastMCP serves the Streamable HTTP endpoint at ``/mcp`` by default; the
 # workspace SDK registers ``http://localhost:8090/mcp`` (phase 3b).
 mcp = FastMCP("office", host=HOST, port=PORT, lifespan=loopwatch.lifespan)
@@ -79,7 +85,7 @@ loopwatch.serve_health(mcp)
 
 @mcp.tool()
 def convert(src: str, to: str = "pdf") -> str:
-    """Convert an Office/Open document to another format with LibreOffice.
+    """Convert an Office/Open document to another format (LibreOffice engine).
 
     Use this to round-trip tender artifacts — e.g. DOCX→PDF for delivery,
     PDF→DOCX for an editable copy, HTML→DOCX to author a proposal, DOCX→TXT
@@ -97,13 +103,13 @@ def convert(src: str, to: str = "pdf") -> str:
 
     Raises:
         Conversion failures (unsupported format, missing/corrupt source,
-        soffice error or timeout) surface as an MCP tool error with a
+        office service error or timeout) surface as an MCP tool error with a
         human-readable message.
     """
     source = Path(src)
     started = time.monotonic()
     try:
-        out = _convert(source, source.parent, to=to)
+        out = _convert(source, source.parent, to=to, convert_url=CONVERT_URL)
     except OfficeConvertError as exc:
         # One structured line per call so Loki can chart error rate / spot a
         # broken input without per-pod scraping. Keys match the ocr sidecar.
@@ -115,7 +121,7 @@ def convert(src: str, to: str = "pdf") -> str:
             exc,
         )
         # FastMCP turns a raised exception into an MCP tool error result.
-        # Fold soffice's stderr into the message so the agent sees why.
+        # Fold the service's own words into the message so the agent sees why.
         detail = f": {exc.stderr.strip()}" if exc.stderr else ""
         raise OfficeConvertError(f"{exc}{detail}") from exc
     log.info(
@@ -293,14 +299,16 @@ def office_shell(cmd: str, cwd: str = "") -> dict[str, object]:
     Prefer a curated tool above whenever one fits — it's faster, tested, and
     the sanctioned path (spreadsheet reads: ``xlsx_extract_cells``; PDF text:
     ``pdf_extract_text``). Reach for this only for genuinely uncovered work,
-    typically something that needs LibreOffice (``soffice``) or another
-    binary on this pod's PATH with no MCP equivalent. Every call here is
+    typically something that needs poppler (``pdftoppm``/``pdftotext``), the
+    python office libraries, or another binary on this pod's PATH with no MCP
+    equivalent. There is no ``soffice`` here — document conversion is the
+    ``convert`` tool, run on the platform's shared office service. Every call here is
     logged and alerted on, so it should stay rare — a repeated pattern is a
     signal to ask for a proper tool instead of reaching for this again.
 
     Args:
         cmd: The shell command to run, exactly as you'd give it to Bash
-            (e.g. ``"soffice --headless --convert-to pdf --outdir /home/agent /home/agent/x.docx"``).
+            (e.g. ``"pdfinfo /home/agent/x.pdf"``).
         cwd: Absolute directory to run it in. Defaults to the shared
             workspace volume root.
 
@@ -478,7 +486,7 @@ def author_pdf(path: str, title: str = "", paragraphs: list[str] | None = None) 
     dest = Path(path)
     started = time.monotonic()
     try:
-        out = _author_pdf(dest, title or None, paragraphs or [])
+        out = _author_pdf(dest, title or None, paragraphs or [], convert_url=CONVERT_URL)
     except OfficeAuthorError as exc:
         _log_author("author_pdf", dest, started, ok=False, err=exc)
         raise

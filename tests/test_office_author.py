@@ -1,14 +1,14 @@
 """Tests for the office authoring logic.
 
-xlsx/docx/pptx authoring is pure-python and runs without LibreOffice, so it's
-fully covered here (produce a file, verify its magic bytes, reopen it with the
-real reader). author_pdf needs ``soffice`` (absent in CI) so it's skipped
-there — the render fork is exercised by the post-deploy integration suite.
+xlsx/docx/pptx authoring is pure-python, so it's fully covered here (produce
+a file, verify its magic bytes, reopen it with the real reader). author_pdf
+renders through the office service, stood in for by the ``convert_stub``
+fixture — what is pinned is the compose (author a DOCX, POST it, move the
+answer into place), not the rendering.
 """
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
@@ -20,6 +20,7 @@ from src.office_author import (
     author_pptx,
     author_xlsx,
 )
+from tests.conftest import ConvertStub
 
 _ZIP_MAGIC = b"PK\x03\x04"
 _PDF_MAGIC = b"%PDF"
@@ -107,13 +108,34 @@ def test_author_pptx_empty_slides_rejected(tmp_path: Path) -> None:
         author_pptx(tmp_path / "p.pptx", [])
 
 
-# --- pdf (needs soffice) ----------------------------------------------------
+# --- pdf (rendered by the office service) ------------------------------------
 
 
-@pytest.mark.skipif(shutil.which("soffice") is None, reason="LibreOffice not installed")
-def test_author_pdf_produces_a_valid_pdf(tmp_path: Path) -> None:
+def test_author_pdf_posts_an_authored_docx_and_lands_the_render(
+    tmp_path: Path, convert_stub: ConvertStub
+) -> None:
     dest = tmp_path / "out.pdf"
-    author_pdf(dest, "Title", ["Body paragraph."])
+    convert_stub.body = b"%PDF-1.7 rendered by the service"
+    author_pdf(dest, "Title", ["Body paragraph."], convert_url=convert_stub.url)
     assert _magic(dest) == _PDF_MAGIC
+    assert dest.read_bytes() == b"%PDF-1.7 rendered by the service"
+    (req,) = convert_stub.requests
+    assert req["path"] == "/cool/convert-to/pdf"
+    body = req["body"]
+    assert isinstance(body, bytes)
+    # What went over the wire is a real DOCX (zip), authored from the input.
+    assert b'filename="doc.docx"' in body
+    assert _ZIP_MAGIC in body
     # The intermediate DOCX must not be left behind next to the output.
     assert list(tmp_path.glob("*.docx")) == []
+
+
+def test_author_pdf_render_failure_is_an_author_error(
+    tmp_path: Path, convert_stub: ConvertStub
+) -> None:
+    convert_stub.status = 500
+    convert_stub.body = b"renderer exploded"
+    convert_stub.content_type = "text/plain"
+    with pytest.raises(OfficeAuthorError, match="PDF render failed: renderer exploded"):
+        author_pdf(tmp_path / "out.pdf", None, ["x"], convert_url=convert_stub.url)
+    assert not (tmp_path / "out.pdf").exists()

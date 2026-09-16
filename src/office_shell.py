@@ -6,8 +6,8 @@ Deliberately shell-shaped rather than a bespoke Python-eval API: Claude is
 heavily trained on Bash idioms, so a tool that mirrors that (a command
 string in, stdout/stderr/exit-code back) minimizes the "unfamiliar surface
 → more turns/worse code" risk a bespoke API would carry. Runs inside this
-pod's existing container — already has LibreOffice/poppler-utils/openpyxl/
-python-docx/python-pptx on its PATH — as the same non-root user, on the same
+pod's existing container — already has poppler-utils/openpyxl/python-docx/
+python-pptx on its PATH (no ``soffice``: conversion is the ``convert`` tool) — as the same non-root user, on the same
 PVC mount, under the same resource limits as every other tool in this
 server. No new privilege, no new trust boundary: a workspace agent already
 runs arbitrary shell commands against its own tenant's files elsewhere in
@@ -39,7 +39,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Mirrors office_convert.py / pdf_text.py: generous enough for a real
-# LibreOffice-class operation, bounded so a stuck command can't wedge a
+# poppler-class operation on a big scan, bounded so a stuck command can't wedge a
 # turn indefinitely.
 _DEFAULT_TIMEOUT_S = 60.0
 

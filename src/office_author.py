@@ -6,8 +6,8 @@ The sanctioned way for the workspace agent to CREATE ``.xlsx`` / ``.docx`` /
 agent hands over structured data (rows, paragraphs, slides) and a real writer
 (openpyxl / python-docx / python-pptx) serialises the bytes, so the agent can
 never emit the broken "XML-under-a-.xlsx-name" that the workspace write guard
-exists to catch. PDF composes: author a DOCX, then reuse LibreOffice
-``convert`` — no separate PDF engine.
+exists to catch. PDF composes: author a DOCX, then reuse ``convert`` (the
+shared office service renders it) — no separate PDF engine.
 
 Zero-copy data plane, same as ``convert``: the caller names a path on the shared
 tenant PVC; this writes the file there and returns the path.
@@ -124,10 +124,10 @@ def author_pptx(dest: Path, slides: list[dict[str, Any]]) -> Path:
     return dest
 
 
-def author_pdf(dest: Path, title: str | None, paragraphs: list[str]) -> Path:
+def author_pdf(dest: Path, title: str | None, paragraphs: list[str], *, convert_url: str) -> Path:
     """Write a real ``.pdf`` at ``dest`` by authoring a DOCX and rendering it
-    with LibreOffice — no separate PDF engine. Same content model as
-    :func:`author_docx`."""
+    through the office service at ``convert_url`` — no separate PDF engine.
+    Same content model as :func:`author_docx`."""
     _ensure_parent(dest)
     # Author + render inside a temp dir on the SAME filesystem as dest so the
     # final move is an atomic rename, and the intermediate DOCX never lands
@@ -137,7 +137,7 @@ def author_pdf(dest: Path, title: str | None, paragraphs: list[str]) -> Path:
             tmp = Path(td)
             author_docx(tmp / "doc.docx", title, paragraphs)
             try:
-                rendered = _convert(tmp / "doc.docx", tmp, to="pdf")
+                rendered = _convert(tmp / "doc.docx", tmp, to="pdf", convert_url=convert_url)
             except OfficeConvertError as exc:
                 detail = f": {exc.stderr.strip()}" if exc.stderr else ""
                 raise OfficeAuthorError(f"PDF render failed{detail}") from exc

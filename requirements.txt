@@ -5,8 +5,13 @@
 # `convert` tool the workspace agent calls over http://localhost:8090/mcp.
 mcp>=1.2,<2
 
-# Document AUTHORING libraries (pure-python; coexist with the image's
-# LibreOffice, which stays for `convert`). These back author_xlsx/docx/pptx —
+# HTTP client for `convert`: the file is POSTed to the platform's shared
+# office service (Collabora Online, /cool/convert-to) — this image carries no
+# LibreOffice of its own. mcp pulls httpx transitively, but a runtime import
+# is declared here, not inherited.
+httpx>=0.27
+
+# Document AUTHORING libraries (pure-python). These back author_xlsx/docx/pptx —
 # the sanctioned way the agent creates Office files, so it never hand-writes a
 # corrupt one. python-pptx pulls in Pillow + lxml transitively.
 # openpyxl also backs xlsx_extract_cells (structured reads, not just authoring).

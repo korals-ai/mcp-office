@@ -3,7 +3,7 @@
 Convert, rasterize and author Office documents. An [MCP](https://modelcontextprotocol.io) server speaking Streamable
 HTTP: run it in a container, point your agent at `http://localhost:8090/mcp`.
 
-LibreOffice document conversion (DOCX/XLSX/PPTX/ODF/PDF/HTML/TXT round-trips), PDF page rasterization and text extraction, structured Excel cell reads, and authoring of new DOCX/XLSX/PPTX/PDF files from structured input.
+Office document conversion (DOCX/XLSX/PPTX/ODF/PDF/HTML/TXT round-trips, rendered by a Collabora Online instance the server is pointed at), PDF page rasterization and text extraction, structured Excel cell reads, and authoring of new DOCX/XLSX/PPTX/PDF files from structured input.
 
 ## Quickstart
 
@@ -57,7 +57,7 @@ to decide when to call it — is in `src/server.py`.
 
 ## Requirements
 
-LibreOffice and poppler-utils, installed in the image. The build pulls ~400 MB of packages and takes several minutes the first time.
+poppler-utils, installed in the image, and a reachable Collabora Online (CODE) instance for `convert` — its base URL goes in the required `OFFICE_CONVERT_URL` environment variable (see `docker-compose.yml`). The image itself carries no LibreOffice.
 
 ## Contributing
 

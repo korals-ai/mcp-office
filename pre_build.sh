@@ -17,6 +17,10 @@ cd "$SCRIPT_DIR"
 # it in the tool pod), and tests/test_server.py imports that module — so the
 # runner supplies it explicitly here. Never a conftest setdefault.
 export WORKSPACE_TOOL_PORT=8090
+# Same rule for the office service base URL `convert` POSTs to: no default in
+# code, so the runner names one. Nothing in the suite reaches it (tests stand
+# up their own local stub server) — it only has to be present.
+export OFFICE_CONVERT_URL=http://collabora.invalid:9980
 
 VENV="$SCRIPT_DIR/.venv"
 

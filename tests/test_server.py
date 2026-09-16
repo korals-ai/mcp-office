@@ -1,9 +1,9 @@
 """Tests for the MCP server wiring.
 
 Verifies the server constructs and registers the ``convert`` tool, and that
-the tool maps conversion failures to an MCP error rather than crashing. Does
-not exercise a real ``soffice`` (absent in CI) — that's the integration
-suite's job against the running sidecar.
+the tool maps conversion failures to an MCP error rather than crashing. The
+office service behind ``convert`` is the ``convert_stub`` fixture; the real
+one is exercised by the post-deploy integration suite.
 """
 
 from __future__ import annotations
@@ -88,6 +88,24 @@ def test_convert_missing_source_raises(tmp_path) -> None:
 
     with pytest.raises(OfficeConvertError):
         server.convert(str(tmp_path / "absent.docx"), "pdf")
+
+
+def test_convert_url_comes_from_the_environment_with_no_default() -> None:
+    # OFFICE_CONVERT_URL is read once at import (the runner exports it); the
+    # tool wrapper passes exactly that base to office_convert.
+    import os
+
+    assert os.environ["OFFICE_CONVERT_URL"] == server.CONVERT_URL
+
+
+def test_convert_tool_posts_to_the_configured_service(tmp_path, convert_stub, monkeypatch) -> None:
+    monkeypatch.setattr(server, "CONVERT_URL", convert_stub.url)
+    src = tmp_path / "a.docx"
+    src.write_bytes(b"PK\x03\x04 x")
+    convert_stub.body = b"%PDF-1.7 ok"
+    out = server.convert(str(src), "pdf")
+    assert out == str(tmp_path / "a.pdf")
+    assert convert_stub.requests[0]["path"] == "/cool/convert-to/pdf"
 
 
 def test_pdf_to_images_missing_source_raises(tmp_path) -> None:
