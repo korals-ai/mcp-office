@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 import loopwatch
+import toolbound
 import toollog
 from mcp.server.fastmcp import FastMCP
 
@@ -83,8 +84,24 @@ mcp = FastMCP("office", host=HOST, port=PORT, lifespan=loopwatch.lifespan)
 # see loopwatch.serve_health.
 loopwatch.serve_health(mcp)
 
+# Bounded-execution ceilings for @toolbound.tool (see toolbound's module
+# docstring for why every tool here runs off the event loop, bounded, instead
+# of inline). Each constant is the tool's own existing inner ceiling (a
+# subprocess/HTTP timeout already enforced in the module below) plus margin,
+# so the OUTER bound is a backstop that should never fire in a healthy pod —
+# except xlsx_extract_cells and the author_* tools, which have NO inner
+# ceiling today (openpyxl/python-docx/python-pptx are in-process library
+# calls with no clock of their own) and so are bounded ONLY by this constant.
+_CONVERT_BOUND_S = 75.0  # office_convert._DEFAULT_TIMEOUT_S = 60
+_PDF_TO_IMAGES_BOUND_S = 135.0  # pdf_rasterize._DEFAULT_TIMEOUT_S = 120
+_PDF_EXTRACT_TEXT_BOUND_S = 45.0  # pdf_text._DEFAULT_TIMEOUT_S = 30
+_XLSX_EXTRACT_BOUND_S = 30.0  # no inner ceiling — this IS the ceiling
+_OFFICE_SHELL_BOUND_S = 75.0  # office_shell._DEFAULT_TIMEOUT_S = 60
+_AUTHOR_BOUND_S = 30.0  # no inner ceiling — in-process writes, generous
+_AUTHOR_PDF_BOUND_S = 75.0  # author_pdf renders via convert_url (office_convert path)
 
-@mcp.tool()
+
+@toolbound.tool(mcp, timeout_s=_CONVERT_BOUND_S)
 def convert(src: str, to: str = "pdf") -> str:
     """Convert an Office/Open document to another format (LibreOffice engine).
 
@@ -134,7 +151,7 @@ def convert(src: str, to: str = "pdf") -> str:
     return str(out)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_PDF_TO_IMAGES_BOUND_S)
 def pdf_to_images(src: str, dpi: int = 150) -> list[str]:
     """Rasterize every page of a PDF to a PNG image, so the agent can visually
     read a drawing that only exists as PDF (any technical drawing — floor
@@ -191,7 +208,7 @@ def pdf_to_images(src: str, dpi: int = 150) -> list[str]:
     return [str(p) for p in pages]
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_PDF_EXTRACT_TEXT_BOUND_S)
 def pdf_extract_text(src: str) -> str:
     """Extract a PDF's real embedded text (all pages) — the deterministic
     alternative to reading a label off a rasterized image. Call this BEFORE
@@ -240,7 +257,7 @@ def pdf_extract_text(src: str) -> str:
     return text
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_XLSX_EXTRACT_BOUND_S)
 def xlsx_extract_cells(
     src: str, sheet: str = "", min_row: int = 0, max_row: int = 0
 ) -> dict[str, object]:
@@ -326,7 +343,7 @@ def xlsx_extract_cells(
     return dict(index)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_OFFICE_SHELL_BOUND_S)
 def office_shell(cmd: str, cwd: str = "") -> dict[str, object]:
     """Run a shell command inside this office tool pod — the fallback for
     whatever the other tools here (``convert``, ``pdf_extract_text``,
@@ -393,7 +410,7 @@ def _log_author(op: str, dest: Path, started: float, ok: bool, err: object = "")
     (log.info if ok else log.warning)(line, *args)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_AUTHOR_BOUND_S)
 def author_xlsx(
     path: str,
     rows: list[list[object]],
@@ -435,7 +452,7 @@ def author_xlsx(
     return str(out)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_AUTHOR_BOUND_S)
 def author_docx(path: str, title: str = "", paragraphs: list[str] | None = None) -> str:
     """Create a real Word ``.docx`` document.
 
@@ -467,7 +484,7 @@ def author_docx(path: str, title: str = "", paragraphs: list[str] | None = None)
     return str(out)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_AUTHOR_BOUND_S)
 def author_pptx(path: str, slides: list[dict[str, object]]) -> str:
     """Create a real PowerPoint ``.pptx`` presentation.
 
@@ -497,7 +514,7 @@ def author_pptx(path: str, slides: list[dict[str, object]]) -> str:
     return str(out)
 
 
-@mcp.tool()
+@toolbound.tool(mcp, timeout_s=_AUTHOR_PDF_BOUND_S)
 def author_pdf(path: str, title: str = "", paragraphs: list[str] | None = None) -> str:
     """Create a real ``.pdf`` from text content (authored as a document, then
     rendered by LibreOffice).

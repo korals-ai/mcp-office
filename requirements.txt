@@ -5,6 +5,11 @@
 # `convert` tool the workspace agent calls over http://localhost:8090/mcp.
 mcp>=1.2,<2
 
+# The shared `toolbound` package (apps/workspace-tools/toolbound) runs every
+# @mcp.tool() off the event loop, bounded by a timeout — mcp pulls anyio
+# transitively, but a runtime import is declared here, not inherited.
+anyio>=4.0
+
 # HTTP client for `convert`: the file is POSTed to the platform's shared
 # office service (Collabora Online, /cool/convert-to) — this image carries no
 # LibreOffice of its own. mcp pulls httpx transitively, but a runtime import

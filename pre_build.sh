@@ -89,5 +89,8 @@ log "  ✓ toollog passed"
 log "Gating the shared loopwatch package..."
 bash "$TL_PARENT/loopwatch/check.sh" "$RUFF" "$MYPY" "$PYTEST" || fail "loopwatch"
 log "  ✓ loopwatch passed"
+log "Gating the shared toolbound package..."
+bash "$TL_PARENT/toolbound/check.sh" "$RUFF" "$MYPY" "$PYTEST" || fail "toolbound"
+log "  ✓ toolbound passed"
 
 log "Pre-build checks complete ✓"

@@ -8,6 +8,9 @@ dependencies = [
     # MCP server SDK — FastMCP + Streamable HTTP transport. The agent
     # reaches this sidecar's tools over http://localhost:8090/mcp.
     "mcp>=1.2,<2",
+    # The shared `toolbound` package runs every tool off the event loop,
+    # bounded by a timeout — a real dependency, declared explicitly.
+    "anyio>=4.0",
     # `convert` POSTs the document to the shared office service.
     "httpx>=0.27",
     # Document authoring (pure-python) — back author_xlsx/docx/pptx.
