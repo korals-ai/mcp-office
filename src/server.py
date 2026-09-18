@@ -70,6 +70,14 @@ log = logging.getLogger("workspace-tool-office")
 HOST = "0.0.0.0"  # noqa: S104 - pod-local bind; nothing injects a host, the pod netns is the fence
 PORT = int(os.environ["WORKSPACE_TOOL_PORT"])
 
+# toolbound.TIMEOUT_TOTAL's own exporter port. The operator injects it iff the
+# roster entry declares a metricsPort — "0/absent = exporter ships inert" is
+# that field's own contract (apps/workspace-operator/internal/controller/
+# sidecars.go), so absence means no exporter, said loudly in main(), never a
+# default port. Same read as kb-search's.
+_METRICS_PORT_RAW = os.environ.get("WORKSPACE_TOOL_METRICS_PORT")
+METRICS_PORT = int(_METRICS_PORT_RAW) if _METRICS_PORT_RAW else None
+
 # Base URL of the shared office service every conversion is POSTed to
 # (Collabora Online — the same LibreOffice the browser editor runs on). Injected
 # by the operator's roster entry; no default, so a pod without it never
@@ -556,6 +564,14 @@ def main() -> None:
         PORT,
         ", ".join(SUPPORTED_FORMATS),
     )
+    if METRICS_PORT is None:
+        log.warning(
+            "tool=office op=metrics outcome=inert: no WORKSPACE_TOOL_METRICS_PORT — the "
+            "roster entry declares no metricsPort, so nothing scrapes this container"
+        )
+    else:
+        toolbound.serve_metrics(METRICS_PORT, HOST)
+        log.info("tool=office op=metrics outcome=ok port=%d path=/metrics", METRICS_PORT)
     mcp.run(transport="streamable-http")
 
 
