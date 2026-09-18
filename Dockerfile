@@ -51,6 +51,12 @@ COPY workspace-tools/toollog ./toollog
 # as `loopwatch` under `python -m` from /app.
 COPY workspace-tools/loopwatch ./loopwatch
 
+# The bounded-tool runner (apps/workspace-tools/toolbound): runs a synchronous
+# @mcp.tool() off the event loop under a hard timeout. Same placement and
+# import rules as toollog above. `import toolbound` in src/server.py with no
+# COPY here shipped seven images that died at import (2026-09-18 incident).
+COPY workspace-tools/toolbound ./toolbound
+
 
 ENV PYTHONPATH=/app
 
