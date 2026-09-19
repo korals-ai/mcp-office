@@ -30,6 +30,7 @@ FROM python:3.12-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
+      tini \
       fonts-dejavu \
       fonts-liberation \
       poppler-utils \
@@ -75,4 +76,6 @@ EXPOSE 8090
 
 USER tool
 
-ENTRYPOINT ["python", "-m", "src.server"]
+# PID 1 drops any signal it has no handler for, so our code never runs as
+# PID 1: tini does, forwarding SIGTERM and reaping orphans.
+ENTRYPOINT ["/usr/bin/tini", "--", "python", "-m", "src.server"]
